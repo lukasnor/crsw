@@ -1,32 +1,19 @@
-use std::error::Error;
-use json;
-use reqwest;
 use tokio;
-use crsw::ecke;
-
+use crsw::{Config, Game};
+use std::{env, process};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let client = reqwest::Client::builder().build()?;
-    let resp = client
-        .get("https://spiele.zeit.de/eckeapi/game/available/regular")
-        .send()
-        .await?
-        .text()
-        .await?;
-    let info = json::parse(&resp).unwrap();
-    let id = info[0]["id"].as_usize().ok_or("Not able to parse id")?;
-    let resp = client
-        .get(String::from("https://spiele.zeit.de/eckeapi/game/") + &id.to_string())
-        .send()
-        .await?
-        .text()
-        .await?;
-    let test_game: ecke::Game = serde_json::from_str(&resp)?;
-    println!("");
-    println!("{}", test_game.latex());
-    for question in test_game.questions {
-        println!("{}", question);
-    }
-    Ok(())
+async fn main(){
+    let mut args : Vec<String> = env::args().collect();
+    args.reverse();// so pop yields the "first" element from now on
+    let config = Config::build(args).unwrap_or_else(|err| {
+        println!("Problem parsing arguments: {}", err);
+        process::exit(1);
+    });
+    let game = crsw::from_config(config).await.unwrap_or_else(|err| {
+        println!("Problem in creating a game: {}", err);
+        process::exit(1);
+    });
+    println!("{}",game.latex());
+    process::exit(0);
 }

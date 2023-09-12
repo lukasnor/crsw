@@ -1,5 +1,35 @@
 use serde::Deserialize;
 use std::fmt;
+use super::Config;
+
+pub async fn get_game(mut config: Config) -> Result<Game, String> {
+    let client = reqwest::Client::builder().build().or_else(|err|{
+        Err(format!("Unable to build HTTP Client with error: {}", err))
+    })?;
+    let resp = client
+        .get("https://spiele.zeit.de/eckeapi/game/available/regular")
+        .send()
+        .await
+        .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
+        .text()
+        .await
+        .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
+    let info = json::parse(&resp).or_else(|err| Err(format!("Unable to parse response as Json with error {}", err)))?;
+    let id = if let Some(id) = config.args.pop() {
+            id.parse::<usize>().or_else(|err| Err(format!("Not able to parse game id given as argument: {}", err)))?
+        } else {
+         info[0]["id"].as_usize().ok_or("Not able to parse game id")?   
+        };
+    let resp = client
+        .get(String::from("https://spiele.zeit.de/eckeapi/game/") + &id.to_string())
+        .send()
+        .await
+        .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
+        .text()
+        .await
+        .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
+    serde_json::from_str(&resp).or_else(|err| Err(format!("Unable to deserialize game Json with error {}",err)))// as Result<Game, String>
+}
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
 enum Direction {
@@ -121,7 +151,7 @@ impl Grid {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-pub struct Question {
+struct Question {
     id: usize,
     game_id: usize,
     nr: usize,
@@ -162,12 +192,12 @@ pub struct Game {
     release_date: String,
     #[serde(rename = "additionalInfo")]
     additional_info: String,
-    pub questions: Vec<Question>,
+    questions: Vec<Question>,
     grid: Grid,
 }
 
-impl Game {
-    pub fn latex(&self) -> String{
+impl super::Game for Game {
+   fn latex(&self) -> String{
 
         let mut s = String::from(&("\\fancyhead[LO]{Um die Ecke Gedacht Nr. ".to_owned()+ &self.game_nr.to_string()+"}\n\n"));
 
