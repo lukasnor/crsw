@@ -7,6 +7,7 @@ A small CLI to generate crosswords from popular puzzle sites.
 ```sh
 crsw zeit > ecke.tex
 ```
+3. Compile the .tex file. The [Crossword package](https://www.ctan.org/pkg/crossword?lang=en) is required.
 
 
 ## Current module names
