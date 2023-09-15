@@ -196,10 +196,14 @@ pub struct Game {
     grid: Grid,
 }
 
+
 impl super::Game for Game {
    fn latex(&self) -> String{
 
-        let mut s = String::from(&("\\fancyhead[LO]{Um die Ecke Gedacht Nr. ".to_owned()+ &self.game_nr.to_string()+"}\n\n"));
+        let mut s = String::from(&("\\documentclass[a4paper,12pt]{article}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n\\usepackage[ngerman]{babel}\n\\usepackage[large,ngerman]{cwpuzzle}\n\\usepackage[margin=1cm, top = 2.5cm]{geometry}\n\\usepackage{fancyhdr}\n\\renewcommand{\\PuzzleUnitlength}{1cm}\n\n\\begin{document}\n\\pagestyle{fancy}\n\\fancyhead{}\n\\fancyfoot{}\n\\fancyhead[LO]{Um die Ecke Gedacht Nr. "
+                .to_owned()+ 
+                &self.game_nr.to_string()+
+                "}\n\n"));
 
         let grid = self.grid.latex();
         s.push_str(&grid);
@@ -223,6 +227,8 @@ impl super::Game for Game {
         vqs.push_str(&"\\end{PuzzleClues}\n");
         s.push_str(&vqs);
 
+
+        s.push_str(&"\\end{document}");
         s
     }
 }
