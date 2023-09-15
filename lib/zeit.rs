@@ -1,18 +1,17 @@
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::fmt;
 use super::Config;
 
-pub async fn get_game(mut config: Config) -> Result<Game, String> {
-    let client = reqwest::Client::builder().build().or_else(|err|{
+pub fn get_game(mut config: Config) -> Result<Game, String> {
+    let client = Client::builder().build().or_else(|err|{
         Err(format!("Unable to build HTTP Client with error: {}", err))
     })?;
     let resp = client
         .get("https://spiele.zeit.de/eckeapi/game/available/regular")
         .send()
-        .await
         .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
         .text()
-        .await
         .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
     let info = json::parse(&resp).or_else(|err| Err(format!("Unable to parse response as Json with error {}", err)))?;
     let id = if let Some(id) = config.args.pop() {
@@ -23,10 +22,8 @@ pub async fn get_game(mut config: Config) -> Result<Game, String> {
     let resp = client
         .get(String::from("https://spiele.zeit.de/eckeapi/game/") + &id.to_string())
         .send()
-        .await
         .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
         .text()
-        .await
         .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
     serde_json::from_str(&resp).or_else(|err| Err(format!("Unable to deserialize game Json with error {}",err)))// as Result<Game, String>
 }

@@ -16,9 +16,9 @@ impl Module {
 }
 
 
-pub async fn from_config(config: Config) -> Result<impl Game, String> {
+pub fn from_config(config: Config) -> Result<impl Game, String> {
     match &config.module {
-        Module::Zeit => zeit::get_game(config).await
+        Module::Zeit => zeit::get_game(config)
     }
 }
         
