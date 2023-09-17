@@ -1,31 +1,37 @@
+use super::Config;
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::fmt;
-use super::Config;
 
 pub fn get_game(mut config: Config) -> Result<Game, String> {
-    let client = Client::builder().build().or_else(|err|{
-        Err(format!("Unable to build HTTP Client with error: {}", err))
-    })?;
+    let client = Client::builder()
+        .build()
+        .map_err(|err| format!("Unable to build HTTP Client with error: {}", err))?;
     let resp = client
         .get("https://spiele.zeit.de/eckeapi/game/available/regular")
         .send()
-        .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
+        .map_err(|err| format!("Unable to send request {}", err))?
         .text()
-        .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
-    let info = json::parse(&resp).or_else(|err| Err(format!("Unable to parse response as Json with error {}", err)))?;
+        .map_err(|err| format!("Unable to turn response to text with error {}", err))?;
+    let info = json::parse(&resp)
+        .map_err(|err| format!("Unable to parse response as Json with error {}", err))?;
     let id = if let Some(id) = config.args.pop() {
-            id.parse::<usize>().or_else(|err| Err(format!("Not able to parse game id given as argument: {}", err)))?
-        } else {
-         info[0]["id"].as_usize().ok_or("Not able to parse game id")?   
-        };
+        id.parse::<usize>()
+            .map_err(|err| format!("Not able to parse game id given as argument: {}", err))?
+    } else {
+        info[0]["id"]
+            .as_usize()
+            .ok_or("Not able to parse game id")?
+    };
     let resp = client
         .get(String::from("https://spiele.zeit.de/eckeapi/game/") + &id.to_string())
         .send()
-        .or_else(|err|  Err(format!("Unable to send request {}", err)) )?
+        .map_err(|err| format!("Unable to send request {}", err))?
         .text()
-        .or_else(|err| Err(format!("Unable to turn response to text with error {}", err)))?;
-    serde_json::from_str(&resp).or_else(|err| Err(format!("Unable to deserialize game Json with error {}",err)))// as Result<Game, String>
+        .map_err(|err| format!("Unable to turn response to text with error {}", err))?;
+    serde_json::from_str(&resp)
+        .map_err(|err| format!("Unable to deserialize game Json with error {}", err))
+    // as Result<Game, String>
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -36,7 +42,7 @@ enum Direction {
     Horizontal,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct MyChar(char);
 impl Default for MyChar {
     fn default() -> Self {
@@ -50,13 +56,13 @@ impl From<char> for MyChar {
     }
 }
 
-impl Into<char> for MyChar {
-    fn into(self) -> char {
-        self.0
+impl From<MyChar> for char {
+    fn from(value: MyChar) -> Self {
+        value.0
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Default)]
 struct GridCell {
     nr: Option<usize>,
     in_horizontal: bool,
@@ -126,7 +132,7 @@ impl Grid {
                 + &self.0[0].len().to_string()
                 + "}{"
                 + &self.0.len().to_string()
-                + "}\n")
+                + "}\n"),
         );
         for row in self.0.iter() {
             for cell in row {
@@ -163,14 +169,18 @@ struct Question {
 
 impl fmt::Display for Question {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frage {}: {}\nAntwort: {}\nErklärung: {}", self.nr ,self.question, self.answer, self.description)
+        write!(
+            f,
+            "Question {}: {}\nAnswer: {}\nExplanation: {}",
+            self.nr, self.question, self.answer, self.description
+        )
     }
 }
 
 impl Question {
     fn latex(&self) -> String {
         let mut s = String::new();
-        s.push_str(&("\\Clue{".to_owned()+&self.nr.to_string()+"}{}{"+&self.question+"}"));
+        s.push_str(&("\\Clue{".to_owned() + &self.nr.to_string() + "}{}{" + &self.question + "}"));
         s
     }
 }
@@ -193,12 +203,10 @@ pub struct Game {
     grid: Grid,
 }
 
-
 impl super::Game for Game {
-   fn latex(&self) -> String{
-
+    fn latex(&self) -> String {
         let mut s = String::from(&("\\documentclass[a4paper,12pt]{article}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n\\usepackage[ngerman]{babel}\n\\usepackage[large,ngerman]{cwpuzzle}\n\\usepackage[margin=1cm, top = 2.5cm]{geometry}\n\\usepackage{fancyhdr}\n\\renewcommand{\\PuzzleUnitlength}{1cm}\n\n\\begin{document}\n\\pagestyle{fancy}\n\\fancyhead{}\n\\fancyfoot{}\n\\fancyhead[LO]{Um die Ecke Gedacht Nr. "
-                .to_owned()+ 
+                .to_owned()+
                 &self.game_nr.to_string()+
                 "}\n\n"));
 
@@ -206,26 +214,33 @@ impl super::Game for Game {
         s.push_str(&grid);
         s.push_str("\n\n");
 
-        let horizontal_qs :Vec<&Question> = self.questions.iter().filter(|q| q.direction == Direction::Horizontal).collect();
+        let horizontal_qs: Vec<&Question> = self
+            .questions
+            .iter()
+            .filter(|q| q.direction == Direction::Horizontal)
+            .collect();
         let mut hqs = String::from("\\begin{PuzzleClues}{\\sffamily\\textbf{Waagerecht}}\n");
         for q in horizontal_qs {
             hqs.push_str(&q.latex());
             hqs.push('\n');
         }
-        hqs.push_str(&"\\end{PuzzleClues}\n");
+        hqs.push_str("\\end{PuzzleClues}\n");
         s.push_str(&hqs);
 
         let mut vqs = String::from("\\begin{PuzzleClues}{\\sffamily\\textbf{Senkrecht}}\n");
-        let vertical_qs: Vec<&Question> = self.questions.iter().filter(|q| q.direction == Direction::Vertical).collect();
+        let vertical_qs: Vec<&Question> = self
+            .questions
+            .iter()
+            .filter(|q| q.direction == Direction::Vertical)
+            .collect();
         for q in vertical_qs {
             vqs.push_str(&q.latex());
             vqs.push('\n');
         }
-        vqs.push_str(&"\\end{PuzzleClues}\n");
+        vqs.push_str("\\end{PuzzleClues}\n");
         s.push_str(&vqs);
 
-
-        s.push_str(&"\\end{document}");
+        s.push_str("\\end{document}");
         s
     }
 }
@@ -314,18 +329,18 @@ impl ShadowGame {
         {
             let cell = &mut grid[q.yc - 1][q.xc - 1];
             // Set number and initial thick line
-            *cell = cell.take().and_then(|mut c| {
+            *cell = cell.take().map(|mut c| {
                 c.nr = Some(q.nr);
                 c.thick_side = true;
-                Some(c)
+                c
             });
             // Set the horizontal flag
             for i in 0..q.length {
                 let cell = &mut grid[q.yc - 1][q.xc - 1 + i];
-                *cell = cell.take().and_then(|mut c| {
+                *cell = cell.take().map(|mut c| {
                     c.in_horizontal = true;
                     c.b = q.answer.chars().nth(i).expect("i < q.length").into();
-                    Some(c)
+                    c
                 });
             }
         }
@@ -338,18 +353,18 @@ impl ShadowGame {
         {
             let cell = &mut grid[q.yc - 1][q.xc - 1];
             // Set number and initial thick line
-            *cell = cell.take().and_then(|mut c| {
+            *cell = cell.take().map(|mut c| {
                 c.nr = Some(q.nr);
                 c.thick_top = true;
-                Some(c)
+                c
             });
             // Set the vertical flag
             for i in 0..q.length {
                 let cell = &mut grid[q.yc - 1 + i][q.xc - 1];
-                *cell = cell.take().and_then(|mut c| {
+                *cell = cell.take().map(|mut c| {
                     c.in_vertical = true;
                     c.b = q.answer.chars().nth(i).expect("i < q.length").into();
-                    Some(c)
+                    c
                 });
             }
         }
