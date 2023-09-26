@@ -3,22 +3,23 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::fmt;
 
-pub fn get_game(mut config: Config) -> Result<Game, String> {
+fn get_game(_config: &mut Config) -> Result<Game, String> {
     let client = Client::builder()
         .build()
-        .map_err(|err| format!("Unable to build HTTP Client with error: {}", err))?;
+        .map_err(|err| format!("Unable to build HTTP Client with error:\n{}", err))?;
     let resp = client
         .get("https://spiele.zeit.de/eckeapi/game/available/regular")
         .send()
         .map_err(|err| format!("Unable to send request {}", err))?
         .text()
-        .map_err(|err| format!("Unable to turn response to text with error {}", err))?;
+        .map_err(|err| format!("Unable to turn response to text with error:\n{}", err))?;
     let info = json::parse(&resp)
-        .map_err(|err| format!("Unable to parse response as Json with error {}", err))?;
-    let id = if let Some(id) = config.args.pop() {
+        .map_err(|err| format!("Unable to parse response as Json with error:\n{}", err))?;
+    // TODO: Add functionality to specify the game id
+    let id = /*if let Some(id) = config.args.pop() {
         id.parse::<usize>()
-            .map_err(|err| format!("Not able to parse game id given as argument: {}", err))?
-    } else {
+            .map_err(|err| format!("Not able to parse game id given as argument:\n{}", err))?
+    } else */{
         info[0]["id"]
             .as_usize()
             .ok_or("Not able to parse game id")?
@@ -26,12 +27,28 @@ pub fn get_game(mut config: Config) -> Result<Game, String> {
     let resp = client
         .get(String::from("https://spiele.zeit.de/eckeapi/game/") + &id.to_string())
         .send()
-        .map_err(|err| format!("Unable to send request {}", err))?
+        .map_err(|err| format!("Unable to send request with error:\n{}", err))?
         .text()
-        .map_err(|err| format!("Unable to turn response to text with error {}", err))?;
+        .map_err(|err| format!("Unable to turn response to text with error:\n{}", err))?;
     serde_json::from_str(&resp)
-        .map_err(|err| format!("Unable to deserialize game Json with error {}", err))
+        .map_err(|err| format!("Unable to deserialize game Json with error:\n{}", err))
     // as Result<Game, String>
+}
+
+pub fn execute(config: &mut Config) -> Result<(), String> {
+    assert_eq!(config.module, super::Module::Zeit);
+    let game = get_game(config)?;
+    if let Some(arg) = config.args.pop() {
+        if arg == "solution" {
+            println!("{}", super::Game::solution(&game));
+            Ok(())
+        } else {
+            Err(format!("Unknown argument: {}", arg))
+        }
+    } else {
+        println!("{}", super::Game::latex(&game));
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -188,7 +205,7 @@ impl Question {
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(from = "ShadowGame")]
-pub struct Game {
+struct Game {
     id: usize,
     name: String,
     #[serde(rename = "gameNr")]
@@ -243,6 +260,17 @@ impl super::Game for Game {
         s.push_str("\\end{document}");
         s
     }
+
+    fn solution(&self) -> String {
+        let mut s = self.grid.to_string();
+        s.push('\n');
+        for q in self.questions.iter() {
+            s.push_str(&q.to_string());
+            s.push('\n');
+        }
+        s.pop();
+        s
+    }
 }
 
 #[derive(Deserialize)]
@@ -283,7 +311,7 @@ impl From<ShadowGame> for Game {
 }
 
 impl ShadowGame {
-    pub fn construct_grid(&self) -> Grid {
+    fn construct_grid(&self) -> Grid {
         // early return if grid is computed
         let rows = self
             .questions

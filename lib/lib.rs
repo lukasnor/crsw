@@ -1,23 +1,20 @@
-mod zeit;
+use strum_macros::{ EnumVariantNames, Display };
+use strum::VariantNames;
 
 pub trait Game {
     /// Returns the LaTeX code for the puzzle
     fn latex(&self) -> String;
+
+    /// Returns a formatted string showing the solution (not necessarily LaTeX)
+    fn solution(&self) -> String;
 }
 
-#[derive(Debug)]
-enum Module {
-    Zeit,
-}
+mod zeit;
 
-impl Module {
-    const MODULES: [&'static str; 1] = ["zeit"];
-}
-
-pub fn from_config(config: Config) -> Result<impl Game, String> {
-    match &config.module {
-        Module::Zeit => zeit::get_game(config),
-    }
+#[derive(Debug, EnumVariantNames, PartialEq, Eq, Display)]
+#[strum(serialize_all="lowercase")]
+pub enum Module {
+    Zeit, Foo
 }
 
 impl TryFrom<String> for Module {
@@ -28,7 +25,7 @@ impl TryFrom<String> for Module {
             _ => Err(format!(
                 "No module with identifier \"{}\" found.\nModule keywords are {:?}",
                 s,
-                Module::MODULES
+                Module::VARIANTS
             )),
         }
     }
@@ -36,7 +33,7 @@ impl TryFrom<String> for Module {
 
 #[derive(Debug)]
 pub struct Config {
-    module: Module,
+    pub module: Module,
     args: Vec<String>,
 }
 
@@ -48,5 +45,12 @@ impl Config {
             .ok_or(String::from("No arguments found"))?
             .try_into()?;
         Ok(Config { module, args })
+    }
+
+    pub fn execute(&mut self) -> Result<(), String> {
+        match &self.module {
+            Module::Zeit => zeit::execute(self),
+            Module::Foo => todo!(),
+        }
     }
 }
