@@ -312,7 +312,6 @@ impl From<ShadowGame> for Game {
 
 impl ShadowGame {
     fn construct_grid(&self) -> Grid {
-        // early return if grid is computed
         let rows = self
             .questions
             .iter()
@@ -422,6 +421,24 @@ impl ShadowGame {
                 cell.thick_top = true;
             } else {
                 cell.thick_side = true;
+            }
+        }
+
+        // Remove thick wall if no cell is above or left of cell at index (i,j)
+        for i in 0..rows {
+            for j in 0..columns {
+                if i == 0 || grid[i - 1][j].is_none() {
+                    grid[i][j] = grid[i][j].take().map(|mut c| {
+                        c.thick_top = false;
+                        c
+                    })
+                }
+                if j == 0 || grid[i][j - 1].is_none() {
+                    grid[i][j] = grid[i][j].take().map(|mut c| {
+                        c.thick_side = false;
+                        c
+                    })
+                }
             }
         }
 
